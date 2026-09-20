@@ -1,0 +1,71 @@
+# =====================================================================
+# Per-project pipeline configuration.
+#
+# The pipeline itself is project-agnostic: it reads any P6 XER. Everything
+# specific to THIS project lives here. Onboarding a new project is a
+# configuration exercise, not a code change.
+# =====================================================================
+
+project:
+  project_id: APX
+  project_name: "Apex_Habitat"
+  client_name: "XYZ"
+  currency_code: INR
+
+  # How to read budgeted units. This project loads rupee values into the
+  # units field at Price/Unit = 1 with UoM = INR, so units ARE currency.
+  # A project loading genuine man-hours reads the same column differently.
+  # Never assume — every value query must respect this.
+  value_basis: currency
+
+source:
+  adapter: xer                 # xer | p6_eppm_rest | pmdb_sql
+  file_pattern: "APX_*.xer"
+  # Filenames carry the data date; the authoritative value is still read
+  # from PROJECT.last_recalc_date inside the file.
+  baseline_files:
+    - "APX_baseline_2023-10-04.xer"
+
+baseline:
+  code: APX_BL01_Original
+  type: "Initial Planning"
+  effective_from: 2023-10-04
+  is_original: true
+
+# Reporting dimensions derived from WBS node names. This is the part that
+# differs most between projects: a highway is Chainage > Structure, a
+# refinery is Unit > System > Discipline.
+dimensions:
+  area_pattern: "^(Tower \\d+|Central Club House|External Development Works)"
+  phase_map:
+    "Structure works": Structure
+    "Finishing": Finishes
+    "Testing And Commissioning": "T&C"
+    "Foundation": Foundation
+    "Procurement": Procurement
+    "Handing Over": Handover
+
+milestones:
+  # This project has no Activity Codes populated, so milestones are
+  # identified by Activity Type plus an ID prefix.
+  id_prefix: "MS-"
+  use_activity_type: true
+
+calendar:
+  # Bound the dim_calendar_day build. Wide enough to cover any forecast.
+  start: 2023-01-01
+  end: 2030-12-31
+
+validation:
+  # ERROR rejects the whole file. A schedule loaded with 3,086 of 3,087
+  # activities is worse than no schedule: nothing downstream can tell it
+  # is incomplete.
+  reject_on_error: true
+  # Absorbs P6's hour-level rounding on imported durations.
+  duration_tolerance_days: 0.5
+
+database:
+  host: localhost
+  port: 5432
+  dbname: APX_warehouse
+  user: postgres
